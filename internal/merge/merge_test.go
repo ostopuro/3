@@ -2,6 +2,7 @@ package merge_test
 
 import (
 	"math"
+	"reflect"
 	"testing"
 
 	"github.com/athom/hotel-merge/internal/domain"
@@ -25,7 +26,7 @@ func TestMergePrefersRicherTextAndFillsLocation(t *testing.T) {
 				Lng: &lng1,
 			},
 			Amenities: domain.Amenities{
-				General: []string{"Pool", "WiFi"},
+				General: []string{"WiFi", "BusinessCenter"},
 			},
 			Images: map[string][]domain.Image{
 				"rooms": {{Link: "room.jpg", Description: "Room"}},
@@ -45,7 +46,7 @@ func TestMergePrefersRicherTextAndFillsLocation(t *testing.T) {
 				Lng:        &lng2,
 			},
 			Amenities: domain.Amenities{
-				General: []string{"wifi", "Breakfast"},
+				General: []string{"indoor pool", "Breakfast"},
 			},
 			Images: map[string][]domain.Image{
 				"rooms": {
@@ -81,8 +82,9 @@ func TestMergePrefersRicherTextAndFillsLocation(t *testing.T) {
 	if merged.Location.Lng == nil || !almostEqual(*merged.Location.Lng, (lng1+lng2)/2) {
 		t.Fatalf("expected averaged longitude, got %v", merged.Location.Lng)
 	}
-	if len(merged.Amenities.General) != 3 {
-		t.Fatalf("expected deduped amenities, got %v", merged.Amenities.General)
+	expectedGeneral := []string{"breakfast", "business center", "indoor pool", "pool", "wifi"}
+	if !reflect.DeepEqual(merged.Amenities.General, expectedGeneral) {
+		t.Fatalf("expected general amenities %v, got %v", expectedGeneral, merged.Amenities.General)
 	}
 	if len(merged.Images["rooms"]) != 2 {
 		t.Fatalf("expected deduped room images, got %v", merged.Images["rooms"])
@@ -113,6 +115,10 @@ func TestMergeAveragesSingleValue(t *testing.T) {
 				Lat: &lat,
 				Lng: &lng,
 			},
+			Amenities: domain.Amenities{
+				General: []string{"WiFi"},
+				Room:    []string{"AirCon"},
+			},
 		},
 	}
 
@@ -126,6 +132,15 @@ func TestMergeAveragesSingleValue(t *testing.T) {
 	}
 	if merged.Location.Lng == nil || !almostEqual(*merged.Location.Lng, lng) {
 		t.Fatalf("expected longitude %v, got %v", lng, merged.Location.Lng)
+	}
+
+	expectedGeneral := []string{"wifi"}
+	expectedRoom := []string{"aircon"}
+	if !reflect.DeepEqual(merged.Amenities.General, expectedGeneral) {
+		t.Fatalf("expected general amenities %v, got %v", expectedGeneral, merged.Amenities.General)
+	}
+	if !reflect.DeepEqual(merged.Amenities.Room, expectedRoom) {
+		t.Fatalf("expected room amenities %v, got %v", expectedRoom, merged.Amenities.Room)
 	}
 }
 

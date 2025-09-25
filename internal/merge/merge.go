@@ -10,7 +10,8 @@ import (
 
 // Merger merges hotels coming from multiple suppliers using deterministic rules.
 type Merger struct {
-	Priority []string
+    Priority        []string
+    AmenityStrategy AmenityStrategy
 }
 
 // Merge produces a single hotel object from supplier inputs keyed by supplier name.
@@ -32,17 +33,17 @@ func (m Merger) Merge(inputs map[string]domain.Hotel) (domain.Hotel, error) {
 		}
 	}
 
-	merged := domain.Hotel{}
-	var initialised bool
+    merged := domain.Hotel{}
+    var initialised bool
 
-	var (
-		amenitiesGeneral  []string
-		amenitiesRoom     []string
-		imageBuckets      = make(map[string][]domain.Image)
-		bookingConditions []string
-		latValues         []float64
-		lngValues         []float64
-	)
+    var (
+        amenitiesGeneral  []string
+        amenitiesRoom     []string
+        imageBuckets      = make(map[string][]domain.Image)
+        bookingConditions []string
+        latValues         []float64
+        lngValues         []float64
+    )
 
 	for _, supplier := range order {
 		hotel, ok := inputs[supplier]
@@ -96,10 +97,14 @@ func (m Merger) Merge(inputs map[string]domain.Hotel) (domain.Hotel, error) {
 		merged.Location.Lng = &avg
 	}
 
-	merged.Amenities = domain.Amenities{
-		General: dedupeStrings(amenitiesGeneral),
-		Room:    dedupeStrings(amenitiesRoom),
-	}
+    strategy := m.AmenityStrategy
+    if strategy == nil {
+        strategy = DefaultAmenityStrategy{}
+    }
+    merged.Amenities = domain.Amenities{
+        General: strategy.Normalize("general", amenitiesGeneral),
+        Room:    strategy.Normalize("room", amenitiesRoom),
+    }
 	merged.Images = dedupeImages(imageBuckets)
 	merged.BookingConditions = dedupeBookingConditions(bookingConditions)
 	merged.LastUpdated = time.Now()
@@ -117,24 +122,6 @@ func chooseRicherText(current, candidate string) string {
 		return cand
 	}
 	return cur
-}
-
-func dedupeStrings(values []string) []string {
-	seen := make(map[string]struct{}, len(values))
-	result := make([]string, 0, len(values))
-	for _, v := range values {
-		trimmed := strings.TrimSpace(v)
-		if trimmed == "" {
-			continue
-		}
-		key := strings.ToLower(trimmed)
-		if _, ok := seen[key]; ok {
-			continue
-		}
-		seen[key] = struct{}{}
-		result = append(result, trimmed)
-	}
-	return result
 }
 
 func dedupeImages(buckets map[string][]domain.Image) map[string][]domain.Image {
