@@ -60,6 +60,11 @@ func (h *Handler) getHotels(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	for i := range results {
+		results[i].LastFetched = nil
+		results[i].LastUpdated = time.Time{}
+		results[i].LastMerged = time.Time{}
+	}
 
 	c.JSON(http.StatusOK, results)
 }
