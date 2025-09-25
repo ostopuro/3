@@ -1,6 +1,7 @@
 package merge_test
 
 import (
+	"math"
 	"testing"
 
 	"github.com/athom/hotel-merge/internal/domain"
@@ -10,6 +11,8 @@ import (
 func TestMergePrefersRicherTextAndFillsLocation(t *testing.T) {
 	lat1 := 1.0
 	lat2 := 2.0
+	lng1 := 100.0
+	lng2 := 102.0
 
 	inputs := map[string]domain.Hotel{
 		"acme": {
@@ -19,6 +22,7 @@ func TestMergePrefersRicherTextAndFillsLocation(t *testing.T) {
 			Description:   "Tiny",
 			Location: domain.Location{
 				Lat: &lat1,
+				Lng: &lng1,
 			},
 			Amenities: domain.Amenities{
 				General: []string{"Pool", "WiFi"},
@@ -37,7 +41,8 @@ func TestMergePrefersRicherTextAndFillsLocation(t *testing.T) {
 				City:       "Singapore",
 				Country:    "Singapore",
 				PostalCode: "123456",
-				Lng:        &lat2,
+				Lat:        &lat2,
+				Lng:        &lng2,
 			},
 			Amenities: domain.Amenities{
 				General: []string{"wifi", "Breakfast"},
@@ -70,11 +75,11 @@ func TestMergePrefersRicherTextAndFillsLocation(t *testing.T) {
 	if merged.Location.City != "Singapore" || merged.Location.Country != "Singapore" {
 		t.Fatalf("expected populated location from paperflies, got city %q country %q", merged.Location.City, merged.Location.Country)
 	}
-	if merged.Location.Lat == nil || *merged.Location.Lat != lat1 {
-		t.Fatalf("expected latitude from acme, got %v", merged.Location.Lat)
+	if merged.Location.Lat == nil || !almostEqual(*merged.Location.Lat, (lat1+lat2)/2) {
+		t.Fatalf("expected averaged latitude, got %v", merged.Location.Lat)
 	}
-	if merged.Location.Lng == nil || *merged.Location.Lng != lat2 {
-		t.Fatalf("expected longitude from paperflies, got %v", merged.Location.Lng)
+	if merged.Location.Lng == nil || !almostEqual(*merged.Location.Lng, (lng1+lng2)/2) {
+		t.Fatalf("expected averaged longitude, got %v", merged.Location.Lng)
 	}
 	if len(merged.Amenities.General) != 3 {
 		t.Fatalf("expected deduped amenities, got %v", merged.Amenities.General)
@@ -95,4 +100,35 @@ func TestMergeRejectsEmptyInput(t *testing.T) {
 	if _, err := merger.Merge(map[string]domain.Hotel{}); err == nil {
 		t.Fatalf("expected error for empty input")
 	}
+}
+
+func TestMergeAveragesSingleValue(t *testing.T) {
+	lat := 51.0
+	lng := -0.1
+	inputs := map[string]domain.Hotel{
+		"acme": {
+			ID:            "H1",
+			DestinationID: 99,
+			Location: domain.Location{
+				Lat: &lat,
+				Lng: &lng,
+			},
+		},
+	}
+
+	merger := merge.Merger{Priority: []string{"acme"}}
+	merged, err := merger.Merge(inputs)
+	if err != nil {
+		t.Fatalf("merge returned error: %v", err)
+	}
+	if merged.Location.Lat == nil || !almostEqual(*merged.Location.Lat, lat) {
+		t.Fatalf("expected latitude %v, got %v", lat, merged.Location.Lat)
+	}
+	if merged.Location.Lng == nil || !almostEqual(*merged.Location.Lng, lng) {
+		t.Fatalf("expected longitude %v, got %v", lng, merged.Location.Lng)
+	}
+}
+
+func almostEqual(a, b float64) bool {
+	return math.Abs(a-b) < 1e-9
 }

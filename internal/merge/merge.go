@@ -35,10 +35,14 @@ func (m Merger) Merge(inputs map[string]domain.Hotel) (domain.Hotel, error) {
 	merged := domain.Hotel{}
 	var initialised bool
 
-	var amenitiesGeneral []string
-	var amenitiesRoom []string
-	imageBuckets := make(map[string][]domain.Image)
-	var bookingConditions []string
+	var (
+		amenitiesGeneral  []string
+		amenitiesRoom     []string
+		imageBuckets      = make(map[string][]domain.Image)
+		bookingConditions []string
+		latValues         []float64
+		lngValues         []float64
+	)
 
 	for _, supplier := range order {
 		hotel, ok := inputs[supplier]
@@ -57,13 +61,11 @@ func (m Merger) Merge(inputs map[string]domain.Hotel) (domain.Hotel, error) {
 		merged.Location.City = chooseRicherText(merged.Location.City, hotel.Location.City)
 		merged.Location.Country = chooseRicherText(merged.Location.Country, hotel.Location.Country)
 		merged.Location.PostalCode = chooseRicherText(merged.Location.PostalCode, hotel.Location.PostalCode)
-		if merged.Location.Lat == nil && hotel.Location.Lat != nil {
-			lat := *hotel.Location.Lat
-			merged.Location.Lat = &lat
+		if hotel.Location.Lat != nil {
+			latValues = append(latValues, *hotel.Location.Lat)
 		}
-		if merged.Location.Lng == nil && hotel.Location.Lng != nil {
-			lng := *hotel.Location.Lng
-			merged.Location.Lng = &lng
+		if hotel.Location.Lng != nil {
+			lngValues = append(lngValues, *hotel.Location.Lng)
 		}
 
 		if len(hotel.Amenities.General) > 0 {
@@ -83,6 +85,15 @@ func (m Merger) Merge(inputs map[string]domain.Hotel) (domain.Hotel, error) {
 		if len(hotel.BookingConditions) > 0 {
 			bookingConditions = append(bookingConditions, hotel.BookingConditions...)
 		}
+	}
+
+	if len(latValues) > 0 {
+		avg := average(latValues)
+		merged.Location.Lat = &avg
+	}
+	if len(lngValues) > 0 {
+		avg := average(lngValues)
+		merged.Location.Lng = &avg
 	}
 
 	merged.Amenities = domain.Amenities{
@@ -177,4 +188,12 @@ func dedupeBookingConditions(conditions []string) []string {
 func normalizeWhitespace(s string) string {
 	fields := strings.Fields(s)
 	return strings.ToLower(strings.Join(fields, " "))
+}
+
+func average(values []float64) float64 {
+	var sum float64
+	for _, v := range values {
+		sum += v
+	}
+	return sum / float64(len(values))
 }
